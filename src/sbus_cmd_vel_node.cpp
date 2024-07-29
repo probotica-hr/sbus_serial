@@ -59,9 +59,17 @@ public:
 		this->declare_parameter("maxSpeed", 1.0);							 // Maximum speed in m/sec for output Twist
 		this->declare_parameter("minTurn", -1.0);							 // Minimum turn rate in radians/sec for output Twist
 		this->declare_parameter("maxTurn", 1.0);
+		this->declare_parameter("minTurboSpeed", -1.0);							 // Minimum speed in m/sec for output Twist
+		this->declare_parameter("maxTurboSpeed", 1.0);							 // Maximum speed in m/sec for output Twist
+		this->declare_parameter("minTurboTurn", -1.0);							 // Minimum turn rate in radians/sec for output Twist
+		this->declare_parameter("maxTurboTurn", 1.0);
 		this->declare_parameter("useStamped", true); // Maximum turn rate in radians/sec for output Twist
 		this->declare_parameter("frameId", "");		 // frame_id for TwistStamped message
 		this->declare_parameter("deadband", 0.0);	 // Deadband is in received sbus values and is both plus and minus around the midpoint and is used for all channels
+		this->declare_parameter("turboChannelIndx", -1);	 
+		this->declare_parameter("turboChannelValue", 100.0);	 
+		this->declare_parameter("disableCmdVelChannelIndx", -1);
+		this->declare_parameter("disableCmdVelChannelValue", 100.0);
 
 		this->get_parameter("forwardChannelIndx", forwardChannelIndx_);
 		this->get_parameter("turnChannelIndx", turnChannelIndx_);
@@ -71,9 +79,17 @@ public:
 		this->get_parameter("maxSpeed", maxSpeed_);
 		this->get_parameter("minTurn", minTurn_);
 		this->get_parameter("maxTurn", maxTurn_);
+		this->get_parameter("minTurboSpeed", minTurboSpeed_);
+		this->get_parameter("maxTurboSpeed", maxTurboSpeed_);
+		this->get_parameter("minTurboTurn", minTurboTurn_);
+		this->get_parameter("maxTurboTurn", maxTurboTurn_);
 		this->get_parameter("useStamped", useStamped_);
 		this->get_parameter("frameId", frameId_);
 		this->get_parameter("deadband", deadband_);
+		this->get_parameter("turboChannelIndx", turboChannelIndx_);
+		this->get_parameter("turboChannelValue", turboChannelValue_);
+		this->get_parameter("disableCmdVelChannelIndx", disableCmdVelChannelIndx_);
+		this->get_parameter("disableCmdVelChannelValue", disableCmdVelChannelValue_);
 
 		sbusRange_ = sbusMaxValue_ - sbusMinValue_; // Calculate range once
 
@@ -98,23 +114,54 @@ private:
 	int sbusRange_; // Calculated when reading min/max
 	double minSpeed_;
 	double maxSpeed_; // m/sec
+	double minTurboSpeed_;
+	double maxTurboSpeed_;
 	double minTurn_;
 	double maxTurn_; // radians/sec
+	double minTurboTurn_;
+	double maxTurboTurn_;
 	double deadband_;
 	int forwardChannelIndx_;
 	int turnChannelIndx_;
 	bool useStamped_;	  // If true, use TwistStamped message with timestamp
 	std::string frameId_; // Only used if useStamped_ is true
+	int turboChannelIndx_;
+	double turboChannelValue_;
+	int disableCmdVelChannelIndx_;
+	double disableCmdVelChannelValue_;
 
 	void sbusCallback(const sbus_serial::msg::Sbus::SharedPtr msg)
 	{
 		double proportional;
+		double minSpeedFinal;
+		double maxSpeedFinal;
+		double minTurnFinal;
+		double maxTurnFinal;
+
+		bool turboMode = false;
+
+	RCLCPP_INFO(this->get_logger(),"Disable cmd vel indx: %d, value: %f",disableCmdVelChannelIndx_,disableCmdVelChannelValue_);
+		if(disableCmdVelChannelIndx_ != -1 && msg->mapped_channels[disableCmdVelChannelIndx_] == disableCmdVelChannelValue_)
+		{
+			RCLCPP_INFO(this->get_logger(),"Usao u dizejbl");
+			return;
+		}
+
+		if (turboChannelIndx_ != -1)
+		{
+			turboMode = msg->mapped_channels[turboChannelIndx_] == turboChannelValue_;
+		} 
+
+		minSpeedFinal = turboMode ? minTurboSpeed_ : minSpeed_;
+		maxSpeedFinal = turboMode ? maxTurboSpeed_ : maxSpeed_;
+		minTurnFinal = turboMode ? minTurboTurn_ : minTurn_;
+		maxTurnFinal = turboMode ? maxTurboTurn_ : maxTurn_;
 
 		proportional = static_cast<double>(msg->mapped_channels[forwardChannelIndx_] - sbusMinValue_) / sbusRange_;
-		double fwdSpeed = minSpeed_ + (maxSpeed_ - minSpeed_) * proportional;
+		double fwdSpeed = minSpeedFinal + (maxSpeedFinal - minSpeedFinal) * proportional;
 
 		proportional = static_cast<double>(msg->mapped_channels[turnChannelIndx_] - sbusMinValue_) / sbusRange_;
-		double turn = minTurn_ + (maxTurn_ - minTurn_) * proportional;
+		double turn = minTurnFinal + (maxTurnFinal - minTurnFinal) * proportional;
 
 		// Adjust for deadband
 		if (std::abs(fwdSpeed) < deadband_)
