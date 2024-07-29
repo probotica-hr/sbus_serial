@@ -140,10 +140,8 @@ private:
 
 		bool turboMode = false;
 
-	RCLCPP_INFO(this->get_logger(),"Disable cmd vel indx: %d, value: %f",disableCmdVelChannelIndx_,disableCmdVelChannelValue_);
 		if(disableCmdVelChannelIndx_ != -1 && msg->mapped_channels[disableCmdVelChannelIndx_] == disableCmdVelChannelValue_)
 		{
-			RCLCPP_INFO(this->get_logger(),"Usao u dizejbl");
 			return;
 		}
 
