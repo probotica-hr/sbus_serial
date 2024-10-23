@@ -1,16 +1,16 @@
 sbus_node:
   ros__parameters:
-    port: "/dev/ttyUSB0"
+    port: "/dev/ttyUSB1"
     refresh_rate_hz: 20
     rxMinValue: 192
     rxMaxValue: 1792
     outMinValue: -100
     outMaxValue: 100
     silentOnFailsafe: true
-    enableChannelNum: 3
+    enableChannelNum: 8
     enableChannelProportionalMin: 1.0
     enableChannelProportionalMax: 1.0
-    deadband: 40
+    deadband: 100
 
 
 sbus_cmd_vel_node:
@@ -24,13 +24,13 @@ sbus_cmd_vel_node:
 
     minSpeed: -1.0
     maxSpeed: 1.0
-    minTurn: -1.0
-    maxTurn: 1.0
+    minTurn: -0.4
+    maxTurn: 0.4
 
     minTurboSpeed: -3.0
     maxTurboSpeed: 3.0
-    minTurboTurn: -3.0
-    maxTurboTurn: 3.0
+    minTurboTurn: -1.0
+    maxTurboTurn: 1.0
 
     disableCmdVelChannelIndx: 4
     disableCmdVelChannelValue: 100.0
