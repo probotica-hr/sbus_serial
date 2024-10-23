@@ -40,7 +40,7 @@ def generate_launch_description():
                 LaunchConfiguration('params_file')
             ],
             remappings=[
-                ('/output/sbus/cmd_vel', '/o3/cmd_vel')
+                ('/output/sbus/cmd_vel', '/seeker_control/seeker_steering_controller/reference')
             ]   
         )
     ])
