@@ -159,7 +159,11 @@ private:
 		double fwdSpeed = minSpeedFinal + (maxSpeedFinal - minSpeedFinal) * proportional;
 
 		proportional = static_cast<double>(msg->mapped_channels[turnChannelIndx_] - sbusMinValue_) / sbusRange_;
-		double turn = minTurnFinal + (maxTurnFinal - minTurnFinal) * proportional;
+		double turn = -(minTurnFinal + (maxTurnFinal - minTurnFinal) * proportional);
+
+		// Adjust for convenient (human-understandable) reverse motion
+		if (fwdSpeed < 0)
+			turn = -turn;
 
 		// Adjust for deadband
 		if (std::abs(fwdSpeed) < deadband_)
