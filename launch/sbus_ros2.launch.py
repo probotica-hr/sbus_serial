@@ -34,13 +34,13 @@ def generate_launch_description():
 
         Node(
             package='sbus_serial',
-            executable='sbus_cmd_vel_node',
-            name='sbus_cmd_vel_node',
+            executable='sbus_commands',
+            name='sbus_commands',
             parameters=[
                 LaunchConfiguration('params_file')
             ],
             remappings=[
-                ('/output/sbus/cmd_vel', '/seeker_control/seeker_steering_controller/reference')
+                ('/sbus/commands', '/seeker_control/seeker_steering_controller/reference')
             ]   
         )
     ])

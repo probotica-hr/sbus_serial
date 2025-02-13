@@ -23,6 +23,7 @@ set(dependencies "rclcpp" "std_msgs" "geometry_msgs")
 find_package(rosidl_default_generators REQUIRED)
 set(msg_files
   "msg/Sbus.msg"
+  "msg/SbusCommands.msg"
   DEPENDENCIES std_msgs
 )
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -38,16 +39,16 @@ ament_target_dependencies(sbus_serial_node ${dependencies})
 target_link_libraries(sbus_serial_node "${cpp_typesupport_target}")
 
 # sbus_cmd_vel_node: include the generated interfaces
-add_executable(sbus_cmd_vel_node src/sbus_cmd_vel_node.cpp)
-ament_target_dependencies(sbus_cmd_vel_node ${dependencies})
-target_link_libraries(sbus_cmd_vel_node "${cpp_typesupport_target}")
+add_executable(sbus_commands src/sbus_commands.cpp)
+ament_target_dependencies(sbus_commands ${dependencies})
+target_link_libraries(sbus_commands "${cpp_typesupport_target}")
 
 # Separate executable for the calibration
 add_executable(sbus_calibrate src/sbus_calibrate.cpp src/sbus_serial_driver.cpp)
 
 # Install executables in lib
 install(
-	TARGETS sbus_serial_node sbus_cmd_vel_node
+	TARGETS sbus_serial_node sbus_commands
 	DESTINATION lib/${PROJECT_NAME}
 )
 
