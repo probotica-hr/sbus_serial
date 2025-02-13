@@ -237,11 +237,33 @@ private:
 			twistStamped.header.stamp = rclcpp::Time(msg->header.stamp);
 			twistStamped.header.frame_id = frameId_;
 
-			cmd_vel_stamped_pub_->publish(twistStamped);
+			if (msg->mapped_channels[enableControlChannelIndex_] == enableControlChannelValue_)
+				cmd_vel_stamped_pub_->publish(twistStamped);
+			else
+			{
+				twistStamped.twist.linear.x = 0.0;
+				twistStamped.twist.linear.y = 0.0;
+				twistStamped.twist.linear.z = 0.0;
+				twistStamped.twist.angular.x = 0.0;
+				twistStamped.twist.angular.y = 0.0;
+				twistStamped.twist.angular.z = 0.0;
+				cmd_vel_stamped_pub_->publish(twistStamped);
+			}
 		}
 		else
 		{
-			cmd_vel_pub_->publish(twist);
+			if (msg->mapped_channels[enableControlChannelIndex_] == enableControlChannelValue_)
+				cmd_vel_pub_->publish(twist);
+			else
+			{
+				twist.linear.x = 0.0;
+				twist.linear.y = 0.0;
+				twist.linear.z = 0.0;
+				twist.angular.x = 0.0;
+				twist.angular.y = 0.0;
+				twist.angular.z = 0.0;
+				cmd_vel_pub_->publish(twist);
+			}
 		}
 		// Enable joystick control
 		std_msgs::msg::Bool enableControl;
