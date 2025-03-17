@@ -22,6 +22,10 @@ def generate_launch_description():
         DeclareLaunchArgument('enableChannelProportionalMax', default_value='0.0', description='Enable channel proportional maximum value'),
         DeclareLaunchArgument('params_file', default_value=default_params_file, description='Path to the YAML file with parameters'),
 
+        DeclareLaunchArgument(
+            'controller_reference_topic',
+            default_value='/seeker_control/seeker_steering_controller/reference',
+            description='Topic where to publish commands.'),
 
         Node(
             package='sbus_serial',
@@ -40,7 +44,7 @@ def generate_launch_description():
                 LaunchConfiguration('params_file')
             ],
             remappings=[
-                ('/sbus/commands', '/seeker_control/seeker_steering_controller/reference')
-            ]   
+                ('/output/sbus/cmd_vel', LaunchConfiguration('controller_reference_topic'))
+            ]
         )
     ])

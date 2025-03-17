@@ -76,6 +76,7 @@ public:
 		// Initialize SBUS port
 		try
 		{
+			RCLCPP_INFO(this->get_logger(), "Initialize SBUS port %s", port_.c_str());
 			sbusPort_ = new sbus_serial::SBusSerialPort(port_, true);
 		}
 		catch (...)
