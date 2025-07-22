@@ -86,6 +86,8 @@ public:
 		this->declare_parameter("hornChannelIndex", -1);
 		this->declare_parameter("hornChannelValue", 100.0);
 		this->declare_parameter("hornChannelToggle", true);
+		this->declare_parameter("timeoutThreshold", 0.25); // Threshold is the allowed time (in s) of the lost connection before 0 reference is sent
+		this->declare_parameter("refresh_rate_hz", 20);		// Refresh rate is how often timer checks if the connection is lost, should be set the same as the driver refresh rate
 
 		this->get_parameter("forwardChannelIndx", forwardChannelIndx_);
 		this->get_parameter("turnChannelIndx", turnChannelIndx_);
@@ -118,10 +120,13 @@ public:
 		this->get_parameter("hornChannelIndex", hornChannelIndex_);
 		this->get_parameter("hornChannelValue", hornChannelValue_);
 		this->get_parameter("hornChannelToggle", hornChannelToggle_);
+		this->get_parameter("timeoutThreshold", timeoutThreshold_);
+		this->get_parameter("refresh_rate_hz", refreshRate_);
 
 		sbusRange_ = sbusMaxValue_ - sbusMinValue_; // Calculate range once
 
 		isFirstRead_ = true;
+		timeout_threshold_ = rclcpp::Duration::from_seconds(timeoutThreshold_);
 
 		sbus_sub_ = this->create_subscription<sbus_serial::msg::Sbus>("/sbus", 1, std::bind(&SbusCommands::sbusCallback, this, std::placeholders::_1));
 
@@ -135,6 +140,12 @@ public:
 		commands_pub_ = this->create_publisher<sbus_serial::msg::SbusCommands>("/joy_commands", 10);
 
 		RCLCPP_INFO(this->get_logger(), "%s started: min/max input = %d/%d, max speed = %.2f m/s, max turn rate = %.2f radians/s", this->get_name(), sbusMinValue_, sbusMaxValue_, maxSpeed_, maxTurn_);
+	
+		last_msg_time_ = this->now();
+
+		sbus_timer_ = this->create_wall_timer(
+				std::chrono::milliseconds(1000 / refreshRate_), // check every refreshRate_ (hz)
+				std::bind(&SbusCommands::timerCallback, this));
 	}
 
 private:
@@ -143,6 +154,9 @@ private:
 	rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr cmd_vel_stamped_pub_;
 	rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr enable_pub_;
 	rclcpp::Publisher<sbus_serial::msg::SbusCommands>::SharedPtr commands_pub_;
+	rclcpp::Time last_msg_time_;
+	rclcpp::TimerBase::SharedPtr sbus_timer_;
+	rclcpp::Duration timeout_threshold_{rclcpp::Duration::from_seconds(0.0)};
 
 	int sbusMinValue_;
 	int sbusMaxValue_;
@@ -183,6 +197,8 @@ private:
 	double previousBatteryState_;
 	double previousLightState_;
 	bool isFirstRead_;
+	double timeoutThreshold_;
+	int refreshRate_;
 
 	void sbusCallback(const sbus_serial::msg::Sbus::SharedPtr msg)
 	{
@@ -191,6 +207,8 @@ private:
 		double maxSpeedFinal;
 		double minTurnFinal;
 		double maxTurnFinal;
+		last_msg_time_ = this->now();
+
 
 		bool turboMode = false;
 
@@ -353,6 +371,31 @@ private:
 		}
 
 		commands_pub_->publish(sbusCommands);
+	}
+
+	void timerCallback()
+	{
+		rclcpp::Time now = this->now();
+
+		if ((now - last_msg_time_) > timeout_threshold_)
+		{
+			if (useStamped_)
+			{
+				geometry_msgs::msg::TwistStamped twist;
+				twist.header.stamp = now;
+				twist.header.frame_id = frameId_;
+				twist.twist.linear.x = 0.0;
+				twist.twist.angular.z = 0.0;
+				cmd_vel_stamped_pub_->publish(twist);
+			}
+			else
+			{
+				geometry_msgs::msg::Twist twist;
+				twist.linear.x = 0.0;
+				twist.angular.z = 0.0;
+				cmd_vel_pub_->publish(twist);
+			}
+		}
 	}
 };
 

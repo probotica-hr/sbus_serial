@@ -15,6 +15,9 @@ sbus_node:
 
 sbus_commands:
   ros__parameters:
+    refresh_rate_hz: 20
+    timeoutThreshold: 0.25     # in s
+
     forwardChannelIndx: 1
     turnChannelIndx: 3
     sbusMinValue: -100
