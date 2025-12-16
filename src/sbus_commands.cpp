@@ -30,6 +30,7 @@
  *  /joystick_commands (SbusCommands)
  * Parameters:
  *  forwardChannelIndx (int): Channel index (not channel number!) for forward/reverse. Default is 1 (channel 2)
+ *  lateralChannelIndx (int): Channel index for lateral (left/right) motion. Default is 3 (channel 4)
  *  turnChannelIndx (int): Channel index for turning. Default is 0 (channel 1)
  *  sbusMinValue (int): Minimum value for SBUS channels. Default is 0
  *  sbusMaxValue (int): Maximum value for SBUS channels. Default is 255
@@ -47,6 +48,7 @@
 #include "std_msgs/msg/bool.hpp"
 
 #define FORWARD_CHANNEL_INDX 1 // Channel 2 (elevator)
+#define LATERAL_CHANNEL_INDX 3 // Channel 4 (lateral movement)
 #define TURN_CHANNEL_INDX 0	   // Channel 1 (ailerons)
 
 class SbusCommands : public rclcpp::Node
@@ -56,6 +58,7 @@ public:
 	{
 		// Read/set parameters
 		this->declare_parameter("forwardChannelIndx", FORWARD_CHANNEL_INDX); // Channel index (not channel number!) for forward/reverse
+		this->declare_parameter("lateralChannelIndx", LATERAL_CHANNEL_INDX); // Channel index for lateral movement
 		this->declare_parameter("turnChannelIndx", TURN_CHANNEL_INDX);		 // Channel index for turning
 		this->declare_parameter("sbusMinValue", 0);							 // Minimum value for SBUS channels
 		this->declare_parameter("sbusMaxValue", 255);						 // Maximum value for SBUS channels
@@ -90,6 +93,7 @@ public:
 		this->declare_parameter("refresh_rate_hz", 20);		// Refresh rate is how often timer checks if the connection is lost, should be set the same as the driver refresh rate
 
 		this->get_parameter("forwardChannelIndx", forwardChannelIndx_);
+		this->get_parameter("lateralChannelIndx", lateralChannelIndx_);
 		this->get_parameter("turnChannelIndx", turnChannelIndx_);
 		this->get_parameter("sbusMinValue", sbusMinValue_);
 		this->get_parameter("sbusMaxValue", sbusMaxValue_);
@@ -171,6 +175,7 @@ private:
 	double maxTurboTurn_;
 	double deadband_;
 	int forwardChannelIndx_;
+	int lateralChannelIndx_;
 	int turnChannelIndx_;
 	bool useStamped_;	  // If true, use TwistStamped message with timestamp
 	std::string frameId_; // Only used if useStamped_ is true
@@ -230,22 +235,19 @@ private:
 		proportional = static_cast<double>(msg->mapped_channels[forwardChannelIndx_] - sbusMinValue_) / sbusRange_;
 		double fwdSpeed = minSpeedFinal + (maxSpeedFinal - minSpeedFinal) * proportional;
 
-		proportional = static_cast<double>(msg->mapped_channels[turnChannelIndx_] - sbusMinValue_) / sbusRange_;
-		double turn = -(minTurnFinal + (maxTurnFinal - minTurnFinal) * proportional);
-
-		// Adjust for convenient (human-understandable) reverse motion
-		if (fwdSpeed < 0)
-			turn = -turn;
+		proportional = static_cast<double>(msg->mapped_channels[lateralChannelIndx_] - sbusMinValue_) / sbusRange_;
+		double lateralSpeed = minSpeedFinal + (maxSpeedFinal - minSpeedFinal) * proportional;
 
 		// Adjust for deadband
 		if (std::abs(fwdSpeed) < deadband_)
 			fwdSpeed = 0.0;
-		if (std::abs(turn) < deadband_)
-			turn = 0.0;
+		if (std::abs(lateralSpeed) < deadband_)
+			lateralSpeed = 0.0;
 
 		geometry_msgs::msg::Twist twist;
 		twist.linear.x = fwdSpeed;
-		twist.angular.z = turn;
+		twist.linear.y = lateralSpeed;
+		twist.angular.z = 0.0;
 
 		// Publish either Twist or TwistStamped message
 		if (useStamped_)

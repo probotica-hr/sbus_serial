@@ -19,7 +19,8 @@ sbus_commands:
     timeoutThreshold: 0.25     # in s
 
     forwardChannelIndx: 1
-    turnChannelIndx: 3
+    lateralChannelIndx: 3
+    turnChannelIndx: 0
     sbusMinValue: -100
     sbusMaxValue: 100
     turboChannelIndx: 4
