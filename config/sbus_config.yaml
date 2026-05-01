@@ -1,20 +1,23 @@
 sbus_node:
   ros__parameters:
-    port: "/dev/ttyUSB1"
+    port: "/dev/ttyUSB0"
     refresh_rate_hz: 20
     rxMinValue: 192
     rxMaxValue: 1792
     outMinValue: -100
     outMaxValue: 100
     silentOnFailsafe: true
-    enableChannelNum: 8
+    enableChannelNum: -1
     enableChannelProportionalMin: 1.0
     enableChannelProportionalMax: 1.0
     deadband: 100
 
 
-sbus_cmd_vel_node:
+sbus_commands:
   ros__parameters:
+    refresh_rate_hz: 20
+    timeoutThreshold: 0.25     # in s
+
     forwardChannelIndx: 1
     turnChannelIndx: 3
     sbusMinValue: -100
@@ -35,7 +38,20 @@ sbus_cmd_vel_node:
     disableCmdVelChannelIndx: 4
     disableCmdVelChannelValue: 100.0
 
+    enableControlChannelIndex: 7
+    enableControlChannelValue: 100.0
+
+    enableUtilCommands: true
+    batteryChannelIndex: 5
+    batteryChannelValue: -100.0
+    batteryChannelToggle: false
+    lightChannelIndex: 8
+    lightChannelValue: 100.0
+    lightChannelToggle: false
+    hornChannelIndex: 6
+    hornChannelValue: 100.0
+    hornChannelToggle: true
+
     useStamped: true
     frameId: ""
     deadband: 0.0
-

@@ -4,8 +4,8 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/opt/ros/humble/include/**",
-                "~/ros2_ws/install/**"
+                "/opt/ros/jazzy/include/**",
+                "~/ros2_ws/**"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
