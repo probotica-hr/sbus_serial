@@ -44,7 +44,7 @@ def generate_launch_description():
                 LaunchConfiguration('params_file')
             ],
             remappings=[
-                ('/output/sbus/cmd_vel', LaunchConfiguration('controller_reference_topic'))
+                ('output/sbus/cmd_vel', LaunchConfiguration('controller_reference_topic')),
             ]
         )
     ])
