@@ -25,18 +25,16 @@
  * Subscribes to:
  *	/sbus (Sbus)
  * Publishes:
- *	/output/sbus/cmd_vel (Twist) - remap as necessary
- *  /joystick_enable (Bool)
- *  /joystick_commands (SbusCommands)
+ *	/output/sbus/cmd_vel (Twist or TwistStamped) - remap as necessary
+ *  /joy_enable (Bool)
+ *  /joy_commands (SbusCommands) - only when joystick enabled
  * Parameters:
- *  forwardChannelIndx (int): Channel index (not channel number!) for forward/reverse. Default is 1 (channel 2)
- *  turnChannelIndx (int): Channel index for turning. Default is 0 (channel 1)
- *  sbusMinValue (int): Minimum value for SBUS channels. Default is 0
- *  sbusMaxValue (int): Maximum value for SBUS channels. Default is 255
- *  minSpeed (double): Minimum speed in m/sec for output Twist. Default is -1.0
- *  maxSpeed (double): Maximum speed in m/sec for output Twist. Default is 1.0
- *  minTurn (double): Minimum turn rate in radians/sec for output Twist. Default is -1.0
- *  maxTurn (double): Maximum turn rate in radians/sec for output Twist. Default is 1.0
+ *  forwardChannelIndx (int): Channel index for forward/reverse. Default is 1
+ *  turnChannelIndx (int): Channel index for turning. Default is 0
+ *  lateralChannelIndx (int): Channel index for lateral (crab) movement. Default is -1 (disabled)
+ *  modeChannelIndex (int): Channel index for 3-position mode switch. Default is -1 (disabled)
+ *  modeChannelThresholdLow (double): Below this = mode 0. Default is -50.0
+ *  modeChannelThresholdHigh (double): Above this = mode 2, between = mode 1. Default is 50.0
  */
 
 #include "rclcpp/rclcpp.hpp"
@@ -54,43 +52,50 @@ class SbusCommands : public rclcpp::Node
 public:
 	SbusCommands() : Node("sbus_commands")
 	{
-		// Read/set parameters
-		this->declare_parameter("forwardChannelIndx", FORWARD_CHANNEL_INDX); // Channel index (not channel number!) for forward/reverse
-		this->declare_parameter("turnChannelIndx", TURN_CHANNEL_INDX);		 // Channel index for turning
-		this->declare_parameter("sbusMinValue", 0);							 // Minimum value for SBUS channels
-		this->declare_parameter("sbusMaxValue", 255);						 // Maximum value for SBUS channels
-		this->declare_parameter("minSpeed", -1.0);							 // Minimum speed in m/sec for output Twist
-		this->declare_parameter("maxSpeed", 1.0);							 // Maximum speed in m/sec for output Twist
-		this->declare_parameter("minTurn", -1.0);							 // Minimum turn rate in radians/sec for output Twist
+		this->declare_parameter("forwardChannelIndx", FORWARD_CHANNEL_INDX);
+		this->declare_parameter("turnChannelIndx", TURN_CHANNEL_INDX);
+		this->declare_parameter("lateralChannelIndx", -1);
+		this->declare_parameter("sbusMinValue", 0);
+		this->declare_parameter("sbusMaxValue", 255);
+		this->declare_parameter("minSpeed", -1.0);
+		this->declare_parameter("maxSpeed", 1.0);
+		this->declare_parameter("minTurn", -1.0);
 		this->declare_parameter("maxTurn", 1.0);
-		this->declare_parameter("minTurboSpeed", -1.0); // Minimum speed in m/sec for output Twist
-		this->declare_parameter("maxTurboSpeed", 1.0);	// Maximum speed in m/sec for output Twist
-		this->declare_parameter("minTurboTurn", -1.0);	// Minimum turn rate in radians/sec for output Twist
+		this->declare_parameter("minTurboSpeed", -1.0);
+		this->declare_parameter("maxTurboSpeed", 1.0);
+		this->declare_parameter("minLateral", -1.0);
+		this->declare_parameter("maxLateral", 1.0);
+		this->declare_parameter("minTurboTurn", -1.0);
 		this->declare_parameter("maxTurboTurn", 1.0);
-		this->declare_parameter("useStamped", true); // Maximum turn rate in radians/sec for output Twist
-		this->declare_parameter("frameId", "");		 // frame_id for TwistStamped message
-		this->declare_parameter("deadband", 0.0);	 // Deadband is in received sbus values and is both plus and minus around the midpoint and is used for all channels
+		this->declare_parameter("minTurboLateral", -1.0);
+		this->declare_parameter("maxTurboLateral", 1.0);
+		this->declare_parameter("useStamped", true);
+		this->declare_parameter("frameId", "");
+		this->declare_parameter("deadband", 0.0);
 		this->declare_parameter("turboChannelIndx", -1);
 		this->declare_parameter("turboChannelValue", 100.0);
-		this->declare_parameter("disableCmdVelChannelIndx", -1);
-		this->declare_parameter("disableCmdVelChannelValue", 100.0);
 		this->declare_parameter("enableUtilCommands", false);
 		this->declare_parameter("enableControlChannelIndex", -1);
 		this->declare_parameter("enableControlChannelValue", 100.0);
-		this->declare_parameter("batteryChannelIndex", -1);		// Channel index (not channel number!) for battery checking
-		this->declare_parameter("batteryChannelValue", 100.0);	// Channel value required for changing states
-		this->declare_parameter("batteryChannelToggle", false); // If set to true, publish only one message upon changing button state
+		this->declare_parameter("reverseTurn", false);
+		this->declare_parameter("modeChannelIndex", -1);
+		this->declare_parameter("modeChannelThresholdLow", -50.0);
+		this->declare_parameter("modeChannelThresholdHigh", 50.0);
+		this->declare_parameter("batteryChannelIndex", -1);
+		this->declare_parameter("batteryChannelValue", 100.0);
+		this->declare_parameter("batteryChannelToggle", false);
 		this->declare_parameter("lightChannelIndex", -1);
 		this->declare_parameter("lightChannelValue", 100.0);
 		this->declare_parameter("lightChannelToggle", false);
 		this->declare_parameter("hornChannelIndex", -1);
 		this->declare_parameter("hornChannelValue", 100.0);
 		this->declare_parameter("hornChannelToggle", true);
-		this->declare_parameter("timeoutThreshold", 0.25); // Threshold is the allowed time (in s) of the lost connection before 0 reference is sent
-		this->declare_parameter("refresh_rate_hz", 20);		// Refresh rate is how often timer checks if the connection is lost, should be set the same as the driver refresh rate
+		this->declare_parameter("timeoutThreshold", 0.25);
+		this->declare_parameter("refresh_rate_hz", 20);
 
 		this->get_parameter("forwardChannelIndx", forwardChannelIndx_);
 		this->get_parameter("turnChannelIndx", turnChannelIndx_);
+		this->get_parameter("lateralChannelIndx", lateralChannelIndx_);
 		this->get_parameter("sbusMinValue", sbusMinValue_);
 		this->get_parameter("sbusMaxValue", sbusMaxValue_);
 		this->get_parameter("minSpeed", minSpeed_);
@@ -99,18 +104,24 @@ public:
 		this->get_parameter("maxTurn", maxTurn_);
 		this->get_parameter("minTurboSpeed", minTurboSpeed_);
 		this->get_parameter("maxTurboSpeed", maxTurboSpeed_);
+		this->get_parameter("minLateral", minLateral_);
+		this->get_parameter("maxLateral", maxLateral_);
 		this->get_parameter("minTurboTurn", minTurboTurn_);
 		this->get_parameter("maxTurboTurn", maxTurboTurn_);
+		this->get_parameter("minTurboLateral", minTurboLateral_);
+		this->get_parameter("maxTurboLateral", maxTurboLateral_);
 		this->get_parameter("useStamped", useStamped_);
 		this->get_parameter("frameId", frameId_);
 		this->get_parameter("deadband", deadband_);
 		this->get_parameter("turboChannelIndx", turboChannelIndx_);
 		this->get_parameter("turboChannelValue", turboChannelValue_);
-		this->get_parameter("disableCmdVelChannelIndx", disableCmdVelChannelIndx_);
-		this->get_parameter("disableCmdVelChannelValue", disableCmdVelChannelValue_);
 		this->get_parameter("enableUtilCommands", enableUtilCommands_);
 		this->get_parameter("enableControlChannelIndex", enableControlChannelIndex_);
 		this->get_parameter("enableControlChannelValue", enableControlChannelValue_);
+		this->get_parameter("reverseTurn", reverseTurn_);
+		this->get_parameter("modeChannelIndex", modeChannelIndex_);
+		this->get_parameter("modeChannelThresholdLow", modeChannelThresholdLow_);
+		this->get_parameter("modeChannelThresholdHigh", modeChannelThresholdHigh_);
 		this->get_parameter("batteryChannelIndex", batteryChannelIndex_);
 		this->get_parameter("batteryChannelValue", batteryChannelValue_);
 		this->get_parameter("batteryChannelToggle", batteryChannelToggle_);
@@ -123,28 +134,27 @@ public:
 		this->get_parameter("timeoutThreshold", timeoutThreshold_);
 		this->get_parameter("refresh_rate_hz", refreshRate_);
 
-		sbusRange_ = sbusMaxValue_ - sbusMinValue_; // Calculate range once
+		sbusRange_ = sbusMaxValue_ - sbusMinValue_;
 
 		isFirstRead_ = true;
 		timeout_threshold_ = rclcpp::Duration::from_seconds(timeoutThreshold_);
 
-		sbus_sub_ = this->create_subscription<sbus_serial::msg::Sbus>("/sbus", 1, std::bind(&SbusCommands::sbusCallback, this, std::placeholders::_1));
+		sbus_sub_ = this->create_subscription<sbus_serial::msg::Sbus>("sbus", 1, std::bind(&SbusCommands::sbusCallback, this, std::placeholders::_1));
 
-		// Only create publisher for stamped/unstamped Twist messages
 		if (useStamped_)
-			cmd_vel_stamped_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>("/output/sbus/cmd_vel", 10);
+			cmd_vel_stamped_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>("output/sbus/cmd_vel", 10);
 		else
-			cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/output/sbus/cmd_vel", 10);
+			cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("output/sbus/cmd_vel", 10);
 
-		enable_pub_ = this->create_publisher<std_msgs::msg::Bool>("/joy_enable", 10);
-		commands_pub_ = this->create_publisher<sbus_serial::msg::SbusCommands>("/joy_commands", 10);
+		enable_pub_ = this->create_publisher<std_msgs::msg::Bool>("joy_enable", 10);
+		commands_pub_ = this->create_publisher<sbus_serial::msg::SbusCommands>("joy_commands", 10);
 
 		RCLCPP_INFO(this->get_logger(), "%s started: min/max input = %d/%d, max speed = %.2f m/s, max turn rate = %.2f radians/s", this->get_name(), sbusMinValue_, sbusMaxValue_, maxSpeed_, maxTurn_);
-	
+
 		last_msg_time_ = this->now();
 
 		sbus_timer_ = this->create_wall_timer(
-				std::chrono::milliseconds(1000 / refreshRate_), // check every refreshRate_ (hz)
+				std::chrono::milliseconds(1000 / refreshRate_),
 				std::bind(&SbusCommands::timerCallback, this));
 	}
 
@@ -160,27 +170,34 @@ private:
 
 	int sbusMinValue_;
 	int sbusMaxValue_;
-	int sbusRange_; // Calculated when reading min/max
+	int sbusRange_;
 	double minSpeed_;
-	double maxSpeed_; // m/sec
+	double maxSpeed_;
 	double minTurboSpeed_;
 	double maxTurboSpeed_;
 	double minTurn_;
-	double maxTurn_; // radians/sec
+	double maxTurn_;
+	double minLateral_;
+	double maxLateral_;
 	double minTurboTurn_;
 	double maxTurboTurn_;
+	double minTurboLateral_;
+	double maxTurboLateral_;
 	double deadband_;
 	int forwardChannelIndx_;
 	int turnChannelIndx_;
-	bool useStamped_;	  // If true, use TwistStamped message with timestamp
-	std::string frameId_; // Only used if useStamped_ is true
+	int lateralChannelIndx_;
+	bool useStamped_;
+	std::string frameId_;
 	int turboChannelIndx_;
 	double turboChannelValue_;
-	int disableCmdVelChannelIndx_;
-	double disableCmdVelChannelValue_;
 	int enableControlChannelIndex_;
 	double enableControlChannelValue_;
+	bool reverseTurn_;
 	bool enableUtilCommands_;
+	int modeChannelIndex_;
+	double modeChannelThresholdLow_;
+	double modeChannelThresholdHigh_;
 	int batteryChannelIndex_;
 	float batteryChannelValue_;
 	bool batteryChannelToggle_;
@@ -203,29 +220,21 @@ private:
 	void sbusCallback(const sbus_serial::msg::Sbus::SharedPtr msg)
 	{
 		double proportional;
-		double minSpeedFinal;
-		double maxSpeedFinal;
-		double minTurnFinal;
-		double maxTurnFinal;
 		last_msg_time_ = this->now();
 
-
 		bool turboMode = false;
-
-		if (disableCmdVelChannelIndx_ != -1 && msg->mapped_channels[disableCmdVelChannelIndx_] == disableCmdVelChannelValue_)
-		{
-			return;
-		}
 
 		if (turboChannelIndx_ != -1)
 		{
 			turboMode = msg->mapped_channels[turboChannelIndx_] == turboChannelValue_;
 		}
 
-		minSpeedFinal = turboMode ? minTurboSpeed_ : minSpeed_;
-		maxSpeedFinal = turboMode ? maxTurboSpeed_ : maxSpeed_;
-		minTurnFinal = turboMode ? minTurboTurn_ : minTurn_;
-		maxTurnFinal = turboMode ? maxTurboTurn_ : maxTurn_;
+		double minSpeedFinal = turboMode ? minTurboSpeed_ : minSpeed_;
+		double maxSpeedFinal = turboMode ? maxTurboSpeed_ : maxSpeed_;
+		double minTurnFinal = turboMode ? minTurboTurn_ : minTurn_;
+		double maxTurnFinal = turboMode ? maxTurboTurn_ : maxTurn_;
+		double minLateralFinal = turboMode ? minTurboLateral_ : minLateral_;
+		double maxLateralFinal = turboMode ? maxTurboLateral_ : maxLateral_;
 
 		proportional = static_cast<double>(msg->mapped_channels[forwardChannelIndx_] - sbusMinValue_) / sbusRange_;
 		double fwdSpeed = minSpeedFinal + (maxSpeedFinal - minSpeedFinal) * proportional;
@@ -233,140 +242,136 @@ private:
 		proportional = static_cast<double>(msg->mapped_channels[turnChannelIndx_] - sbusMinValue_) / sbusRange_;
 		double turn = -(minTurnFinal + (maxTurnFinal - minTurnFinal) * proportional);
 
-		// Adjust for convenient (human-understandable) reverse motion
-		if (fwdSpeed < 0)
+		double lateral = 0.0;
+		if (lateralChannelIndx_ != -1)
+		{
+			proportional = static_cast<double>(msg->mapped_channels[lateralChannelIndx_] - sbusMinValue_) / sbusRange_;
+			lateral = minLateralFinal + (maxLateralFinal - minLateralFinal) * proportional;
+			if (std::abs(lateral) < deadband_)
+				lateral = 0.0;
+		}
+
+		if (reverseTurn_ && fwdSpeed < 0)
 			turn = -turn;
 
-		// Adjust for deadband
 		if (std::abs(fwdSpeed) < deadband_)
 			fwdSpeed = 0.0;
 		if (std::abs(turn) < deadband_)
 			turn = 0.0;
 
-		geometry_msgs::msg::Twist twist;
-		twist.linear.x = fwdSpeed;
-		twist.angular.z = turn;
+		bool joystickEnabled = (msg->mapped_channels[enableControlChannelIndex_] == enableControlChannelValue_);
 
-		// Publish either Twist or TwistStamped message
+		geometry_msgs::msg::Twist twist;
+		if (joystickEnabled)
+		{
+			twist.linear.x = fwdSpeed;
+			twist.linear.y = lateral;
+			twist.angular.z = turn;
+		}
+
 		if (useStamped_)
 		{
 			geometry_msgs::msg::TwistStamped twistStamped;
 			twistStamped.twist = twist;
 			twistStamped.header.stamp = rclcpp::Time(msg->header.stamp);
 			twistStamped.header.frame_id = frameId_;
-
-			if (msg->mapped_channels[enableControlChannelIndex_] == enableControlChannelValue_)
-				cmd_vel_stamped_pub_->publish(twistStamped);
-			else
-			{
-				twistStamped.twist.linear.x = 0.0;
-				twistStamped.twist.linear.y = 0.0;
-				twistStamped.twist.linear.z = 0.0;
-				twistStamped.twist.angular.x = 0.0;
-				twistStamped.twist.angular.y = 0.0;
-				twistStamped.twist.angular.z = 0.0;
-				cmd_vel_stamped_pub_->publish(twistStamped);
-			}
+			cmd_vel_stamped_pub_->publish(twistStamped);
 		}
 		else
 		{
-			if (msg->mapped_channels[enableControlChannelIndex_] == enableControlChannelValue_)
-				cmd_vel_pub_->publish(twist);
-			else
-			{
-				twist.linear.x = 0.0;
-				twist.linear.y = 0.0;
-				twist.linear.z = 0.0;
-				twist.angular.x = 0.0;
-				twist.angular.y = 0.0;
-				twist.angular.z = 0.0;
-				cmd_vel_pub_->publish(twist);
-			}
+			cmd_vel_pub_->publish(twist);
 		}
-		// Enable joystick control
+
 		std_msgs::msg::Bool enableControl;
-		enableControl.data = false;
-		if (msg->mapped_channels[enableControlChannelIndex_] == enableControlChannelValue_)
-		{
-			enableControl.data = true;
-		}
+		enableControl.data = joystickEnabled;
 		enable_pub_->publish(enableControl);
 
-		if (!enableUtilCommands_)
+		if (!joystickEnabled)
 			return;
 
-		if (lightChannelIndex_ < 0 || hornChannelIndex_ < 0 || batteryChannelIndex_ < 0)
-		{
-			throw rclcpp::exceptions::InvalidParameterValueException("Channel index value must be set to a positive number or is out of range (range: 0-8)");
+		if (!enableUtilCommands_ && modeChannelIndex_ == -1)
 			return;
-		}
-		if ((lightChannelToggle_ && lightChannelIndex_ < 6) || (hornChannelToggle_ && hornChannelIndex_ < 6) || (batteryChannelToggle_ && batteryChannelIndex_ < 6))
-		{
-			throw rclcpp::exceptions::InvalidParameterValueException("Selected channels (0-5) cannot be set to toggle. Change ChannelIndex or ChannelToggle parameters.");
-			return;
-		}
-		if (isFirstRead_)
-		{
-			if (batteryChannelToggle_)
-				previousBatteryState_ = msg->mapped_channels[batteryChannelIndex_];
-			if (lightChannelToggle_)
-				previousLightState_ = msg->mapped_channels[lightChannelIndex_];
-			if (hornChannelToggle_)
-				previousHornState_ = msg->mapped_channels[hornChannelIndex_];
-			isFirstRead_ = false;
-		}
 
 		sbus_serial::msg::SbusCommands sbusCommands;
+		sbusCommands.mode = 0;
 		sbusCommands.battery_charge = false;
 		sbusCommands.lights = false;
 		sbusCommands.horn = false;
 
-		// Battery control
-		if (batteryChannelToggle_)
+		if (modeChannelIndex_ != -1)
 		{
-			if (previousBatteryState_ != msg->mapped_channels[batteryChannelIndex_])
-			{
-				sbusCommands.battery_charge = true;
-				previousBatteryState_ = msg->mapped_channels[batteryChannelIndex_];
-			}
+			double modeValue = msg->mapped_channels[modeChannelIndex_];
+			if (modeValue < modeChannelThresholdLow_)
+				sbusCommands.mode = 0;
+			else if (modeValue > modeChannelThresholdHigh_)
+				sbusCommands.mode = 2;
+			else
+				sbusCommands.mode = 1;
 		}
-		else
+
+		if (enableUtilCommands_)
 		{
-			if (msg->mapped_channels[batteryChannelIndex_] == batteryChannelValue_)
+			if (lightChannelIndex_ < 0 || hornChannelIndex_ < 0 || batteryChannelIndex_ < 0)
 			{
-				sbusCommands.battery_charge = true;
+				throw rclcpp::exceptions::InvalidParameterValueException("Channel index value must be set to a positive number or is out of range (range: 0-8)");
+				return;
 			}
-		}
-		// Lights control
-		if (lightChannelToggle_)
-		{
-			if (previousLightState_ != msg->mapped_channels[lightChannelIndex_])
+			if ((lightChannelToggle_ && lightChannelIndex_ < 6) || (hornChannelToggle_ && hornChannelIndex_ < 6) || (batteryChannelToggle_ && batteryChannelIndex_ < 6))
 			{
-				sbusCommands.lights = true;
-				previousLightState_ = msg->mapped_channels[lightChannelIndex_];
+				throw rclcpp::exceptions::InvalidParameterValueException("Selected channels (0-5) cannot be set to toggle. Change ChannelIndex or ChannelToggle parameters.");
+				return;
 			}
-		}
-		else
-		{
-			if (msg->mapped_channels[lightChannelIndex_] == lightChannelValue_)
+			if (isFirstRead_)
 			{
-				sbusCommands.lights = true;
+				if (batteryChannelToggle_)
+					previousBatteryState_ = msg->mapped_channels[batteryChannelIndex_];
+				if (lightChannelToggle_)
+					previousLightState_ = msg->mapped_channels[lightChannelIndex_];
+				if (hornChannelToggle_)
+					previousHornState_ = msg->mapped_channels[hornChannelIndex_];
+				isFirstRead_ = false;
 			}
-		}
-		// Horn control
-		if (hornChannelToggle_)
-		{
-			if (previousHornState_ != msg->mapped_channels[hornChannelIndex_])
+
+			if (batteryChannelToggle_)
 			{
-				sbusCommands.horn = true;
-				previousHornState_ = msg->mapped_channels[hornChannelIndex_];
+				if (previousBatteryState_ != msg->mapped_channels[batteryChannelIndex_])
+				{
+					sbusCommands.battery_charge = true;
+					previousBatteryState_ = msg->mapped_channels[batteryChannelIndex_];
+				}
 			}
-		}
-		else
-		{
-			if (msg->mapped_channels[hornChannelIndex_] == hornChannelValue_)
+			else
 			{
-				sbusCommands.horn = true;
+				if (msg->mapped_channels[batteryChannelIndex_] == batteryChannelValue_)
+					sbusCommands.battery_charge = true;
+			}
+
+			if (lightChannelToggle_)
+			{
+				if (previousLightState_ != msg->mapped_channels[lightChannelIndex_])
+				{
+					sbusCommands.lights = true;
+					previousLightState_ = msg->mapped_channels[lightChannelIndex_];
+				}
+			}
+			else
+			{
+				if (msg->mapped_channels[lightChannelIndex_] == lightChannelValue_)
+					sbusCommands.lights = true;
+			}
+
+			if (hornChannelToggle_)
+			{
+				if (previousHornState_ != msg->mapped_channels[hornChannelIndex_])
+				{
+					sbusCommands.horn = true;
+					previousHornState_ = msg->mapped_channels[hornChannelIndex_];
+				}
+			}
+			else
+			{
+				if (msg->mapped_channels[hornChannelIndex_] == hornChannelValue_)
+					sbusCommands.horn = true;
 			}
 		}
 
@@ -384,15 +389,11 @@ private:
 				geometry_msgs::msg::TwistStamped twist;
 				twist.header.stamp = now;
 				twist.header.frame_id = frameId_;
-				twist.twist.linear.x = 0.0;
-				twist.twist.angular.z = 0.0;
 				cmd_vel_stamped_pub_->publish(twist);
 			}
 			else
 			{
 				geometry_msgs::msg::Twist twist;
-				twist.linear.x = 0.0;
-				twist.angular.z = 0.0;
 				cmd_vel_pub_->publish(twist);
 			}
 		}

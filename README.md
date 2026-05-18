@@ -1,53 +1,107 @@
 # sbus_serial
 
-ROS 2 package for parsing Futaba SBUS serial data from a RC receiver for remote control (teleoperation) of ROS-based robots.
+ROS 2 package for parsing DJI/Futaba SBUS serial data from an RC receiver for remote control (teleoperation) of ROS-based robots. Probotica fork with additional features for robot control.
 
 SBUS is a serial protocol for RC receivers where the values of up to 16 channels are sent over one serial channel.
 
-Read the [Wiki](https://github.com/jenswilly/sbus_serial/wiki/ROS2) which contains all the information you need to use this package.
+## Nodes
 
-The package contains the following executables:
+### sbus_serial_node
 
-- `sbus_serial_node` containing:
-  - `sbus_serial`: node reading SBUS data from a serial port and publishing `Sbus` data
-- `sbus_cmd_vel_node` containing:
-  - `sbus_cmd_vel`: node subscribing to the `/sbus` topic and publishing corresponding `Twist` _or_ `TwistStamped` message on the `/output/sbus/cmd_vel` topic. Use parameters and topic remapping as required. (See comments in sbus_cmd_vel_node.cpp for more info)
-- `sbus_calibrate` (installed in the packages's `share` directory): stand-alone executable to calibrate data from the receiver (see details in the [Wiki](https://github.com/jenswilly/sbus_serial/wiki/ROS2)).
+Reads SBUS data from a serial port and publishes parsed channel values.
 
-The package also contains the following custom interfaces:
+**Publishes:** `/sbus` (`sbus_serial/msg/Sbus`)
 
-- `sbus_serial/msg/Sbus`:  
-  Values received and mapped from the SBUS input.
+**Parameters:**
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `port` | `/dev/tty11` | Serial port for SBUS receiver |
+| `refresh_rate_hz` | `2` | Polling rate |
+| `rxMinValue` | `172` | Raw SBUS minimum value |
+| `rxMaxValue` | `1811` | Raw SBUS maximum value |
+| `outMinValue` | `0` | Mapped output minimum |
+| `outMaxValue` | `255` | Mapped output maximum |
+| `silentOnFailsafe` | `false` | Suppress publishing during failsafe |
+| `enableChannelNum` | `-1` | Channel for proportional enable (-1 = disabled) |
+| `deadband` | `0` | Raw value deadband around midpoint |
 
-## ROS version
+### sbus_commands (sbus_cmd_vel_node)
 
-The code in this branch is written for [ROS 2 Humble Hawksbill](https://docs.ros.org/en/humble/Releases/Release-Humble-Hawksbill.html).
+Subscribes to SBUS data and publishes `Twist` or `TwistStamped` velocity commands. Includes turbo mode, deadman switch, connection timeout, and utility command outputs.
 
-The [ros1](https://github.com/jenswilly/sbus_serial/tree/ros1) branch contains the old code for ROS 1.
+**Subscribes:** `/sbus` (`sbus_serial/msg/Sbus`)
 
-## Compiling
+**Publishes:**
+- `/output/sbus/cmd_vel` (`Twist` or `TwistStamped`) — velocity command, remap as needed
+- `/joystick_enable` (`Bool`) — enable state from control channel
+- `/joystick_commands` (`sbus_serial/msg/SbusCommands`) — utility commands (lights, horn, battery)
 
-Compile as usual: `colcon build`.
+**Parameters:**
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `forwardChannelIndx` | `1` | Channel index for forward/reverse |
+| `turnChannelIndx` | `0` | Channel index for turning |
+| `sbusMinValue` | `0` | Expected SBUS input minimum |
+| `sbusMaxValue` | `255` | Expected SBUS input maximum |
+| `minSpeed` / `maxSpeed` | `-1.0` / `1.0` | Speed range (m/s) |
+| `minTurn` / `maxTurn` | `-1.0` / `1.0` | Turn rate range (rad/s) |
+| `minTurboSpeed` / `maxTurboSpeed` | `-1.0` / `1.0` | Turbo speed range (m/s) |
+| `minTurboTurn` / `maxTurboTurn` | `-1.0` / `1.0` | Turbo turn range (rad/s) |
+| `turboChannelIndx` | `-1` | Channel index for turbo toggle (-1 = disabled) |
+| `turboChannelValue` | `100.0` | Threshold to activate turbo |
+| `disableCmdVelChannelIndx` | `-1` | Channel index for disabling cmd_vel output |
+| `disableCmdVelChannelValue` | `100.0` | Threshold to disable cmd_vel |
+| `enableControlChannelIndex` | `-1` | Channel index for joystick enable |
+| `enableControlChannelValue` | `100.0` | Threshold for enable |
+| `useStamped` | `true` | Publish `TwistStamped` instead of `Twist` |
+| `frameId` | `""` | frame_id for `TwistStamped` header |
+| `deadband` | `0.0` | Deadband around midpoint |
+| `timeoutThreshold` | `0.25` | Seconds without data before sending zero reference |
+| `refresh_rate_hz` | `20` | Timer rate for timeout checking |
 
-If you get an error saying, "boost/algorithm/clamp.hpp: No such file or directory", you need to install the Boost C++ libraries. On Ubuntu, run `sudo apt-get install libboost-dev`.
+**Utility commands** (set `enableUtilCommands: true`):
+| Parameter | Description |
+|-----------|-------------|
+| `batteryChannelIndex` / `batteryChannelValue` / `batteryChannelToggle` | Battery charge toggle |
+| `lightChannelIndex` / `lightChannelValue` / `lightChannelToggle` | Lights toggle |
+| `hornChannelIndex` / `hornChannelValue` / `hornChannelToggle` | Horn toggle |
 
-## Usage
+### sbus_calibrate
 
-A typical setup will launch `sbus_serial` and `sbus_cmd_vel` nodes.
+Standalone executable for calibrating raw SBUS values from the receiver. Installed in the package's `share` directory.
 
-The `sbus_serial` node should be configured with port name (e.g. `/dev/ttyS0`) and appropriate values for min/max (see the [Wiki](https://github.com/jenswilly/sbus_serial/wiki/ROS2)).
+## Custom Messages
 
-The `sbus_cmd_vel` node should be configured with Sbus min/max matching the output from the `sbus_serial` node
-and appropriate min/max values for `Twist` speed and turn. The published topic (`/output/sbus/cmd_vel`) should
-also be remapped to the appropriate topic.
+- `sbus_serial/msg/Sbus` — Header + 16 raw channels + 16 mapped channels + failsafe/frame_lost flags
+- `sbus_serial/msg/SbusCommands` — Utility command states (lights, horn, battery_charge)
 
-### Turtlesim
+## Launch
 
-The package contains a launch file to use the Sbus to control the Turtlesim for testing.
+```bash
+ros2 launch sbus_serial sbus_ros2.launch.py
+```
 
-The launch file launches `turtlesim turtlesim_node` and `sbus_serial sbus_cmd_vel_node` but _not_ the `sbus_serial_node` as that could be running on another device (e.g. the SBUS RC is connected to a Raspberry Pi controller and the Turtlesim
-is running on a full desktop Ubuntu computer). So be sure to launch `sbus_serial sbus_serial_node` with appropriate parameters separately or the test will be real boring.
+**Launch arguments:**
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `port` | `/dev/ttyUSB0` | Serial port |
+| `params_file` | `config/sbus_config.yaml` | Parameter file |
+| `controller_reference_topic` | `/seeker_control/seeker_steering_controller/reference` | Output topic for cmd_vel (remapped) |
 
-The `sbus_serial_node` should output Sbus values from 0-255 and channel 3 (throttle) is used for forward speed while channel 1 (aileron) is used for turning.
+The launch file starts both `sbus_serial_node` and `sbus_commands`, remapping the cmd_vel output to the specified controller reference topic.
 
-If the `minSpeed` parameter is set to a negative value, the turtle will reverse when control stick is at bottom.
+## Configuration
+
+See `config/sbus_config.yaml` for a complete example configuration used with Probotica robots.
+
+## Building
+
+```bash
+colcon build --packages-select sbus_serial
+```
+
+Requires Boost (`sudo apt-get install libboost-dev` if missing).
+
+## Origin
+
+Forked from [jenswilly/sbus_serial](https://github.com/jenswilly/sbus_serial). Extended with turbo mode, deadman switch, connection timeout handling, utility commands, and TwistStamped support.

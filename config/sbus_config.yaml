@@ -1,57 +1,63 @@
-sbus_node:
-  ros__parameters:
-    port: "/dev/ttyUSB0"
-    refresh_rate_hz: 20
-    rxMinValue: 192
-    rxMaxValue: 1792
-    outMinValue: -100
-    outMaxValue: 100
-    silentOnFailsafe: true
-    enableChannelNum: -1
-    enableChannelProportionalMin: 1.0
-    enableChannelProportionalMax: 1.0
-    deadband: 100
+/**/sbus_node:
+    ros__parameters:
+        port: "/dev/ttyUSB0"
+        refresh_rate_hz: 20
+        rxMinValue: 192
+        rxMaxValue: 1792
+        outMinValue: -100
+        outMaxValue: 100
+        silentOnFailsafe: true
+        enableChannelNum: -1
+        enableChannelProportionalMin: 1.0
+        enableChannelProportionalMax: 1.0
+        deadband: 100
 
+/**/sbus_commands:
+    ros__parameters:
+        refresh_rate_hz: 20
+        timeoutThreshold: 0.25 # in s
 
-sbus_commands:
-  ros__parameters:
-    refresh_rate_hz: 20
-    timeoutThreshold: 0.25     # in s
+        forwardChannelIndx: 1
+        turnChannelIndx: 3
+        lateralChannelIndx: 0
+        sbusMinValue: -100
+        sbusMaxValue: 100
+        turboChannelIndx: 4
+        turboChannelValue: 0.0
 
-    forwardChannelIndx: 1
-    turnChannelIndx: 3
-    sbusMinValue: -100
-    sbusMaxValue: 100
-    turboChannelIndx: 4
-    turboChannelValue: 0.0
+        minSpeed: -1.0
+        maxSpeed: 1.0
+        minTurn: -0.4
+        maxTurn: 0.4
+        minLateral: -1.0
+        maxLateral: 1.0
 
-    minSpeed: -1.0
-    maxSpeed: 1.0
-    minTurn: -0.4
-    maxTurn: 0.4
+        minTurboSpeed: -3.0
+        maxTurboSpeed: 3.0
+        minTurboTurn: -1.0
+        maxTurboTurn: 1.0
+        minTurboLateral: -3.0
+        maxTurboLateral: 3.0
 
-    minTurboSpeed: -3.0
-    maxTurboSpeed: 3.0
-    minTurboTurn: -1.0
-    maxTurboTurn: 1.0
+        enableControlChannelIndex: 7
+        enableControlChannelValue: 100.0
 
-    disableCmdVelChannelIndx: 4
-    disableCmdVelChannelValue: 100.0
+        modeChannelIndex: 5
+        modeChannelThresholdLow: -50.0
+        modeChannelThresholdHigh: 50.0
 
-    enableControlChannelIndex: 7
-    enableControlChannelValue: 100.0
+        enableUtilCommands: false
+        batteryChannelIndex: 5
+        batteryChannelValue: -100.0
+        batteryChannelToggle: false
+        lightChannelIndex: 8
+        lightChannelValue: 100.0
+        lightChannelToggle: false
+        hornChannelIndex: 6
+        hornChannelValue: 100.0
+        hornChannelToggle: true
 
-    enableUtilCommands: true
-    batteryChannelIndex: 5
-    batteryChannelValue: -100.0
-    batteryChannelToggle: false
-    lightChannelIndex: 8
-    lightChannelValue: 100.0
-    lightChannelToggle: false
-    hornChannelIndex: 6
-    hornChannelValue: 100.0
-    hornChannelToggle: true
-
-    useStamped: true
-    frameId: ""
-    deadband: 0.0
+        reverseTurn: false
+        useStamped: true
+        frameId: ""
+        deadband: 0.0
