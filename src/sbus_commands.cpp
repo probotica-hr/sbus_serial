@@ -149,6 +149,11 @@ public:
 		enable_pub_ = this->create_publisher<std_msgs::msg::Bool>("joy_enable", 10);
 		commands_pub_ = this->create_publisher<sbus_serial::msg::SbusCommands>("joy_commands", 10);
 
+		if (enableControlChannelIndex_ < 0)
+		{
+			RCLCPP_WARN(this->get_logger(), "enableControlChannelIndex is %d — joystick enable will never be true. Set to a valid channel (0-8).", enableControlChannelIndex_);
+		}
+
 		RCLCPP_INFO(this->get_logger(), "%s started: min/max input = %d/%d, max speed = %.2f m/s, max turn rate = %.2f radians/s", this->get_name(), sbusMinValue_, sbusMaxValue_, maxSpeed_, maxTurn_);
 
 		last_msg_time_ = this->now();
@@ -199,13 +204,13 @@ private:
 	double modeChannelThresholdLow_;
 	double modeChannelThresholdHigh_;
 	int batteryChannelIndex_;
-	float batteryChannelValue_;
+	double batteryChannelValue_;
 	bool batteryChannelToggle_;
 	int lightChannelIndex_;
-	float lightChannelValue_;
+	double lightChannelValue_;
 	bool lightChannelToggle_;
 	int hornChannelIndex_;
-	float hornChannelValue_;
+	double hornChannelValue_;
 	bool hornChannelToggle_;
 	double currentBatteryState_;
 	double currentLightState_;
@@ -259,7 +264,8 @@ private:
 		if (std::abs(turn) < deadband_)
 			turn = 0.0;
 
-		bool joystickEnabled = (msg->mapped_channels[enableControlChannelIndex_] == enableControlChannelValue_);
+		bool joystickEnabled = (enableControlChannelIndex_ >= 0) &&
+			(msg->mapped_channels[enableControlChannelIndex_] == enableControlChannelValue_);
 
 		geometry_msgs::msg::Twist twist;
 		if (joystickEnabled)
@@ -267,6 +273,12 @@ private:
 			twist.linear.x = fwdSpeed;
 			twist.linear.y = lateral;
 			twist.angular.z = turn;
+		}
+		else
+		{
+			twist.linear.x = 0.0;
+			twist.linear.y = 0.0;
+			twist.angular.z = 0.0;
 		}
 
 		if (useStamped_)
@@ -389,13 +401,23 @@ private:
 				geometry_msgs::msg::TwistStamped twist;
 				twist.header.stamp = now;
 				twist.header.frame_id = frameId_;
+				twist.twist.linear.x = 0.0;
+				twist.twist.linear.y = 0.0;
+				twist.twist.angular.z = 0.0;
 				cmd_vel_stamped_pub_->publish(twist);
 			}
 			else
 			{
 				geometry_msgs::msg::Twist twist;
+				twist.linear.x = 0.0;
+				twist.linear.y = 0.0;
+				twist.angular.z = 0.0;
 				cmd_vel_pub_->publish(twist);
 			}
+
+			std_msgs::msg::Bool enableControl;
+			enableControl.data = false;
+			enable_pub_->publish(enableControl);
 		}
 	}
 };
