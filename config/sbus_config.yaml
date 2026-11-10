@@ -57,6 +57,24 @@
         hornChannelValue: 100.0
         hornChannelToggle: true
 
+        # Winch mode (hold-to-run via Trigger services, see winch_hold_to_run.hpp).
+        # winchModeIndex: mode value (0/1/2) that is winch mode, -1 = disabled.
+        # In winch mode the twist is forced to zero and the stick on
+        # winchChannelIndx drives the winch: full one way = wind, full the other
+        # way = unwind, anything else = stop. Each service is called once per change.
+        winchModeIndex: -1
+        winchChannelIndx: 1
+        winchChannelThreshold: 90.0
+        winchInvert: false
+        winchWindService: "/winch/winch/wind"
+        winchUnwindService: "/winch/winch/unwind"
+        winchStopService: "/winch/winch/stop"
+        winchStopRetryPeriod: 0.5
+        winchServiceTimeout: 2.0
+        # Dry run: no service is called, the service that WOULD be called is
+        # published on winch_mock (std_msgs/String). Set false to arm the real winch.
+        winchMock: false
+
         reverseTurn: false
         useStamped: true
         frameId: ""

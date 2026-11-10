@@ -17,7 +17,8 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
-set(dependencies "rclcpp" "std_msgs" "geometry_msgs")
+find_package(std_srvs REQUIRED)
+set(dependencies "rclcpp" "std_msgs" "geometry_msgs" "std_srvs")
 
 # Generate the interfaces
 find_package(rosidl_default_generators REQUIRED)
@@ -63,5 +64,16 @@ install(
 	TARGETS sbus_calibrate
 	DESTINATION share/${PROJECT_NAME}
 )
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_winch_hold_to_run test/test_winch_hold_to_run.cpp)
+  target_include_directories(test_winch_hold_to_run PRIVATE include)
+
+  ament_add_gtest(test_sbus_commands_mock test/test_sbus_commands_mock.cpp)
+  target_include_directories(test_sbus_commands_mock PRIVATE include)
+  ament_target_dependencies(test_sbus_commands_mock ${dependencies})
+  target_link_libraries(test_sbus_commands_mock "${cpp_typesupport_target}")
+endif()
 
 ament_package()

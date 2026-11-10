@@ -66,6 +66,32 @@ Subscribes to SBUS data and publishes `Twist` or `TwistStamped` velocity command
 | `lightChannelIndex` / `lightChannelValue` / `lightChannelToggle` | Lights toggle |
 | `hornChannelIndex` / `hornChannelValue` / `hornChannelToggle` | Horn toggle |
 
+#### Winch mode (hold-to-run)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `winchModeIndex` | `-1` | Mode value (0/1/2 from the mode switch) that is "winch mode" (-1 = disabled) |
+| `winchChannelIndx` | `1` | Channel index read as the winch stick (default: forward stick) |
+| `winchChannelThreshold` | `90.0` | `abs(value)` at or above this counts as full deflection |
+| `winchInvert` | `false` | `false`: +stick = unwind (pay out), -stick = wind (pull in) |
+| `winchWindService` / `winchUnwindService` / `winchStopService` | `/winch/winch/{wind,unwind,stop}` | `std_srvs/Trigger` services of the winch driver |
+| `winchStopRetryPeriod` | `0.5` | Retry a failed stop after this many seconds |
+| `winchServiceTimeout` | `2.0` | Treat an unanswered call as failed after this long |
+| `winchMock` | `false` | Dry run: no service is called; the name of the service that would have been called is published on `winch_mock` (`std_msgs/String`, transient_local), once per change |
+
+In winch mode the published twist is forced to zero (with `joy_enable` still true, so the
+joystick slot keeps priority in the reference mux and the robot holds still) and the winch
+stick is read as a tri-state: full one way calls the wind service, full the other way calls
+the unwind service, anything else calls stop. Each service is called once per change; a
+direction change goes through stop first; the stick must be seen centred once after entering
+winch mode before a direction is accepted; deadman release, SBUS timeout and leaving winch
+mode all send stop. The decision logic lives in `include/winch_hold_to_run.hpp` and is unit
+tested in `test/` (`colcon test --packages-select sbus_serial`).
+
+To validate a new channel mapping without touching the winch, set `winchMock: true` and watch
+`ros2 topic echo /winch_mock` while flipping the mode switch and moving the stick; the twist
+is still zeroed in winch mode, so the robot behaves exactly as it will when armed.
+
 ### sbus_calibrate
 
 Standalone executable for calibrating raw SBUS values from the receiver. Installed in the package's `share` directory.
